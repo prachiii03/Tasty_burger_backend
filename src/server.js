@@ -14,12 +14,34 @@ const userRoutes = require('./routes/user');
 const adminRoutes = require('./routes/admin');
 const phonepeRoutes = require('./routes/phonepe');
 
-connectDB();
 const app = express();
+
+// 1. Immediately handle preflight OPTIONS before ANY other middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
+
+// 2. Serverless DB connection middleware (only for actual requests, not OPTIONS)
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+  } catch (err) {
+    console.error('DB middleware error:', err);
+  }
+  next();
+});
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: true,
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -205,14 +227,10 @@ app.use('*', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📱 API available at http://localhost:${PORT}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-  console.log(`🍔 Products: http://localhost:${PORT}/products`);
-  console.log(`🖼️  Static files: http://localhost:${PORT}/uploads/`);
-  console.log(`💰 PhonePe: http://localhost:${PORT}/phonepe/pay ✅`);
-  console.log(`🐛 Debug uploads: http://localhost:${PORT}/debug/uploads`);
-  console.log(`🐛 Debug products: http://localhost:${PORT}/debug/products`);
-  console.log(`🐛 Debug routes: http://localhost:${PORT}/debug/routes`);
-}); 
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
+}
+
+module.exports = app; 
